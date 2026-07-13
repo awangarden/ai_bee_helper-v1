@@ -48,9 +48,9 @@ tools = [
 
 
 async def bee_assistant(question):
-    system_promt = 'Ты помощник пчеловода. Стиль ответов формальный. Любая тема кроме пчеловодства должна пресекаться. Ты должен отвечать "Я помогаю только по темам связаным с пчеловодством" Отвечай СТРОГО в формате JSON с полями: answer (str), confidence (0-1) (float), sources (list[str]), vet_needed (bool) (Нужен ли специалист для более качественного ответа на вопрос). Никакого текста вне JSON.'
+    system_prompt = 'Ты помощник пчеловода. Стиль ответов формальный. Любая тема кроме пчеловодства должна пресекаться. Ты должен отвечать "Я помогаю только по темам связаным с пчеловодством" Отвечай СТРОГО в формате JSON с полями: answer (str), confidence (0-1) (float), sources (list[str]), vet_needed (bool) (Нужен ли специалист для более качественного ответа на вопрос). Никакого текста вне JSON.'
     messages = [
-        {"role": "system", "content": system_promt},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": question},
     ]
     resp = await async_client.chat.completions.create(
@@ -67,17 +67,25 @@ async def bee_assistant(question):
             messages.append(
                 {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
             )
-            final = await async_client.chat.completions.create(
-                model=MODEL, messages=messages
-            )
+        final = await async_client.chat.completions.create(
+            model=MODEL, messages=messages
+        )
 
-            raw = final.choices[0].message.content
+        raw = final.choices[0].message.content
+        try:
             data = json.loads(raw)
             return BeeAnswer(**data)
+        except (json.JSONDecodeError, json.ValidationError) as e:
+            print(f"Модель вернула невалидный ответ: {e}\nСырой ответ: {raw}")
+            return None
     else:
         raw = msg.content
-        data = json.loads(raw)
-        return BeeAnswer(**data)
+        try:
+            data = json.loads(raw)
+            return BeeAnswer(**data)
+        except (json.JSONDecodeError, json.ValidationError) as e:
+            print(f"Модель вернула невалидный ответ: {e}\nСырой ответ: {raw}")
+            return None
 
 
 async def main():
